@@ -28,9 +28,18 @@ import javax.ws.rs.QueryParam
 import javax.ws.rs.core.MediaType
 import javax.ws.rs.core.Response
 
+import net.corda.core.identity.CordaX500Name
+
+val SERVICE_NAMES = listOf("Notary Service", "Network Map Service")
+
+
 // API.
 @Path("yo")
 class YoApi(val rpcOps: CordaRPCOps) {
+    
+    private val myLegalName: CordaX500Name = rpcOps.nodeInfo().legalIdentities.first().name
+
+    
     @GET
     @Path("yo")
     @Produces(MediaType.APPLICATION_JSON)
@@ -64,12 +73,18 @@ class YoApi(val rpcOps: CordaRPCOps) {
     @GET
     @Path("me")
     @Produces(MediaType.APPLICATION_JSON)
-    fun me() = mapOf("me" to rpcOps.nodeInfo().legalIdentities.first().name)
+    fun me() = mapOf("me" to myLegalName)
 
     @GET
     @Path("peers")
     @Produces(MediaType.APPLICATION_JSON)
-    fun peers() = mapOf("peers" to rpcOps.networkMapSnapshot().map { it.legalIdentities.first().name })
+    fun peers(): Map<String, List<CordaX500Name>> {
+        val nodeInfo = rpcOps.networkMapSnapshot()
+        return mapOf("peers" to nodeInfo
+                .map { it.legalIdentities.first().name }
+                //filter out myself, notary and eventual network map started by driver
+                .filter { it.organisation !in (SERVICE_NAMES + myLegalName.organisation) })
+    }
 }
 
 // Flow.
